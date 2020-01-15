@@ -1,0 +1,65 @@
+# ------------------------------------------------------------------------------
+# Task = create hex grids for designing camera trap surveys
+# Andrew Bengsen, NSW DPI, 15-JAN-2020
+# ------------------------------------------------------------------------------
+
+library(sp); library(lattice); library(rgdal); library(rgeos); library(raster)
+
+# Specify whether you want to write new shapefiles for the grids created
+write_shapefiles <- F
+
+# Define a projected coordinate reference system with a scale in metres,
+# e.g. for NSW Lambert, EPSG3308
+# coordRefSys <- CRS("+proj=lcc +lat_1=-30.75 +lat_2=-35.75 +lat_0=-33.25 +lon_0=147 +x_0=9300000 +y_0=4500000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs")
+
+coordRefSys <- CRS()
+crsWGS84 <- CRS("+proj=longlat +datum=WGS84 +no_defs")
+
+# Load region boundary shape file (layer) from the working directory
+dsn <- getwd()
+region  <- readOGR(dsn=dsn, layer="")
+
+# Create hexagonal grid with X m between centre points
+# ------------------------------------------------------------------------------
+
+# cellsize argument = 2* incircle radius of a hexagon
+x <- 800
+HexPts <-spsample(x = region, type="hexagonal", cellsize=x, offset=c(0.5,0.5))  
+ notes <- c(1:length(HexPts))
+ HexPtsDF <- SpatialPointsDataFrame(HexPts, data=as.data.frame(notes), 
+                                    proj4string = coordRefSys, match.ID=F) 
+ HexPtsDF$cell <- as.factor(c(1:length(HexPtsDF))) # add unique ID for each cell
+ HexPtsDF$label  <- factor(rep("na", length(HexPtsDF))) 
+ HexPtsDF$site  <- factor(rep("na", length(HexPtsDF)))  # create a field to allow site name to be entered later
+ HexPtsDF
+
+HexPols <- HexPoints2SpatialPolygons(HexPts)
+plot(HexPols)
+plot(region, lwd=3, add=F)
+plot(HexPts, add=T)
+
+# Convert grid to Spatial Polygons Data Frame and write as a shapefile
+HexPols <- SpatialPolygonsDataFrame(HexPols, data=as.data.frame(names(HexPols)), match.ID=F)
+ HexPols$cell <- as.factor(c(1:length(HexPols)))     # add unique cell ID for each cell
+ HexPols$site  <- factor(rep("na", length(HexPols)))  # create a field to allow reserve name to be entered later
+ HexPols
+
+# Specify buffer distance, in metres
+BufferDist <- 50
+Buff <- gBuffer(HexPts, width=BufferDist)
+        
+plot(Buff, add=T)
+Buffdf <- SpatialPolygonsDataFrame(Buff, data=as.data.frame(1), match.ID=F)
+plot(Buffdf)
+
+# Save shapefiles        
+if(write_shapefiles == T){          
+        writeOGR(Buffdf, dsn=dsn, 
+                 layer=paste0("HexGrid", x, "m_Buffer", BufferDist, "m"), 
+                 driver="ESRI Shapefile", overwrite_layer = T)
+        writeOGR(HexPols, dsn=dsn, layer=paste0("HexGrid_", x, "m"), 
+                 driver="ESRI Shapefile", overwrite_layer = T)        
+        writeOGR(HexPtsDF, dsn=dsn, layer=paste0("HexPts_", x, "m"), 
+                 driver="ESRI Shapefile", overwrite_layer = T)
+}
+nrow(HexPols)
