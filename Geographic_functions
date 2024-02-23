@@ -1,15 +1,16 @@
 # Convert WGS84 coords to a projected crs
 # ---------------------------------------
 
-WGS84toCRS <- function(x,y,crs){
+WGS84toCRS <- function(x, y, crs) {
   # x = longitude, WGS84
   # y = latitude, WGS84
-  # crs = output CRS, defined using rgdal::CRS()
-  xy <- data.frame(ID = 1:length(x), X = x, Y = y)
-  coordinates(xy) <- c("X", "Y")
-  proj4string(xy) <- CRS("+proj=longlat +datum=WGS84") 
-  res <- spTransform(xy, crs)
-  return(as.data.frame(res))
+  # crs = output crs, defined using terra::crs()
+  dat_xy <- cbind(x,y) %>%
+    as.data.frame() %>%
+    st_as_sf(coords = c("x", "y"), crs="+proj=longlat +datum=WGS84") %>%
+    as_Spatial()
+  xy <- data.frame(x = dat_xy$coords.x1,
+                   y = dat_xy$coords.x2)
 }
 
 # Convert projected coords to WGS84
